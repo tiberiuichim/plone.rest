@@ -9,8 +9,13 @@ from zope.configuration.fields import GlobalObject
 from zope.interface import Interface
 from zope.publisher.interfaces.browser import IBrowserPublisher
 from zope.schema import TextLine, Bool
-from zope.security.checker import CheckerPublic
+from plone.rest import interfaces
+from plone.rest.traverse import NAME_PREFIX
+from plone.rest.cors import wrap_cors, options_view
+
+from zope.component.zcml import adapter
 from zope.security.zcml import Permission
+from zope.security.checker import CheckerPublic
 
 
 class IService(Interface):
@@ -54,21 +59,33 @@ class IService(Interface):
         required=False,
         default=u'')
 
-    cors_enabled = Bool(
-        title=u"The name of the view that should be the default."
-              u"[get|post|put|delete]",
-        description=u"""
-        This name refers to view that should be the view used by
-        default (if no view name is supplied explicitly).""",
-        required=False
+    cors_enabled = Boolean(
+        title=u"CORS enabled",
+        description=u""" To use if you especially want to disable CORS support for a particular
+        service / method.""",
+        default=True
         )
 
     cors_origin = TextLine(
-        title=u"The name of the view that should be the default." +
-              u"[get|post|put|delete]",
+        title=u"CORS origin",
         description=u"""
-        This name refers to view that should be the view used by
-        default (if no view name is supplied explicitly).""",
+        The list of origins for CORS. You can use wildcards here if needed,
+        e.g. ('list', 'of', '*.domain').""",
+        required=False,
+        default=u'*'
+        )
+
+    cors_headers = Text(
+        title=u"List of headers that are enabled on cors",
+        description="The list of headers supported for the services",
+        required=False
+        )
+
+    cors_expose_all_headers = TextLine(
+        title=u"Expose all the headers",
+        description=""" If set to True, all the headers will be exposed and considered valid
+        ones (Default: True). If set to False, all the headers need be
+        explicitly mentioned with the cors_headers parameter.""",
         required=False
         )
 
@@ -87,6 +104,7 @@ def serviceDirective(
         for_,
         name=u'',
         cors_enabled=False,
+        layer=None,
         cors_origin=None,
         permission=CheckerPublic
         ):
@@ -123,16 +141,15 @@ def serviceDirective(
         service_id = register_service(method.upper(), media_type)
         view_name = service_id + name
 
-        if cors_enabled:
+        if cors_origin:
             # Check if there is already an adapter for options
 
-            # Register
             adapter(
                 _context,
-                factory=(get_cors_preflight_view),
+                factory=(options_view(cors_origin),),
                 provides=IBrowserPublisher,
                 for_=(for_, interfaces.IOPTIONS),
-                name=view_name,
+                name=view_name
             )
 
         adapter(
