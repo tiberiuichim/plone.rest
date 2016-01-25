@@ -12,6 +12,7 @@ class RESTTraverse(DefaultPublishTraverse):
     adapts(IPloneSiteRoot, IAPIRequest)
 
     def publishTraverse(self, request, name):
+
         try:
             obj = super(RESTTraverse, self).publishTraverse(request, name)
         except KeyError:
@@ -63,6 +64,7 @@ class RESTWrapper(object):
 
     def publishTraverse(self, request, name):
         # Try to get an object using default traversal
+
         adapter = DefaultPublishTraverse(self.context, request)
         try:
             obj = adapter.publishTraverse(request, name)
