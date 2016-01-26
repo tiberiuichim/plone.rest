@@ -15,8 +15,13 @@ def mark_as_api_request(event):
        actual request method and Accept header.
     """
     # In cors calls there is accept header so we need to force
+
     if event.request.get('REQUEST_METHOD') == 'OPTIONS':
+        alsoProvides(event.request, IAPIRequest)
         alsoProvides(event.request, IOPTIONS)
+        # May have problems with webdav
+        # All OPTIONS calls are going to be considered API/REST
+        event.request.maybe_webdav_client = 0
     request = event.request
     method = request.get('REQUEST_METHOD', 'GET')
     accept = request.getHeader('Accept', 'text/html')
