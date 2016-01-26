@@ -14,10 +14,12 @@ from plone.rest import interfaces
 from plone.rest.traverse import NAME_PREFIX
 from plone.rest.cors import wrap_cors, options_view
 from plone.rest.cors import wrap_cors, options_view, options_view_wrap
+from plone.rest.cors import options_view, options_view_wrap
+from zope.security.checker import CheckerPublic, Checker, defineChecker
+from zope.security.checker import getCheckerForInstancesOf, undefineChecker
 
 from zope.component.zcml import adapter
 from zope.security.zcml import Permission
-from zope.security.checker import CheckerPublic
 
 # We need to maintain a temp struct on memory to configure properly
 DICT_CORS_SERVICES = {}
@@ -149,7 +151,10 @@ def serviceDirective(
     for n in ('browserDefault', '__call__', 'publishTraverse'):
         required[n] = permission
 
-    # defineChecker(factory, Checker(required))
+    if getCheckerForInstancesOf(factory) and permission != CheckerPublic:
+        # in case already exist remove old checker
+        undefineChecker(factory)
+        defineChecker(factory, Checker(required))
 
     media_types = parse_accept_header(accept)
     for media_type in media_types:
@@ -172,6 +177,7 @@ def serviceDirective(
 
         cors_headers = cors_headers.split('\n') if cors_headers \
             else cors_headers
+
         cors_options = {
             'origin': map(str.strip, str(cors_origin).split(',')),
             'headers': cors_headers,
@@ -198,33 +204,35 @@ def serviceDirective(
         # If you configure the OPTIONS view at last it will work, otherwise
         # is going to be removed for next cors definition
         if marker == interfaces.IOPTIONS:
+            new_factory = options_view_wrap(
+                factory,
+                DICT_CORS_SERVICES[(for_, name)])
 
             adapter(
                 _context,
-                factory=(options_view_wrap(
-                    factory,
-                    DICT_CORS_SERVICES[(for_, name)],
-                    cors_options),),
+                factory=(new_factory,),
                 provides=IBrowserPublisher,
-                for_=(for_, marker),
+                for_=(for_, interfaces.IOPTIONS),
                 name=NAME_PREFIX + name
             )
         else:
             # Configure option views
+            new_factory = options_view(
+                DICT_CORS_SERVICES[(for_, name)])
 
             adapter(
                 _context,
-                factory=(options_view(DICT_CORS_SERVICES[(for_, name)]),),
+                factory=(new_factory,),
                 provides=IBrowserPublisher,
                 for_=(for_, interfaces.IOPTIONS),
                 name=NAME_PREFIX + name
             )
 
-            # Wrap factory with cors headers
+            # The real factory
 
             adapter(
                 _context,
-                factory=(wrap_cors(factory, cors_options),),
+                factory=(factory,),
                 provides=IBrowserPublisher,
                 for_=(for_, marker),
                 name=NAME_PREFIX + name
