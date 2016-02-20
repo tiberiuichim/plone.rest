@@ -6,6 +6,12 @@ import json
 
 class Service(zope.publisher.browser.BrowserPage):
 
+    stream = False
+
     def __call__(self):
-        self.request.response.setHeader("Content-Type", "application/json")
-        return json.dumps(self.render(), indent=2, sort_keys=True)
+        result = self.render()
+        if not self.stream:
+            self.request.response.setHeader("Content-Type", "application/json")
+            return json.dumps(result, indent=2, sort_keys=True)
+        else:
+            return result
