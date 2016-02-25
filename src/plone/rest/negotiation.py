@@ -7,9 +7,10 @@ def parse_accept_header(accept):
        of media type tuples.
     """
     media_types = []
-    for media_range in accept.split(','):
-        media_type = media_range.split(';')[0].strip()
-        media_types.append(media_type)
+    if accept:
+        for media_range in accept.split(','):
+            media_type = media_range.split(';')[0].strip()
+            media_types.append(media_type)
     return media_types
 
 
